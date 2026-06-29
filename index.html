@@ -885,44 +885,40 @@ const DATA = [
   {no:38, nama:"Ni Putu Pradnya Wulandari",              uang:48000},
 ];
 
-// ─── PERSISTENT STORAGE ───────────────────────────────────────────────────────
-// Data verifikasi disimpan secara permanen dan dibagikan ke semua pengguna
-// menggunakan window.storage (shared=true) bawaan platform Claude.
-//
-// Struktur: key "verified" → JSON { "1": {metode, waktu}, "2": {...}, ... }
+// ─── PERSISTENT STORAGE (localStorage) ───────────────────────────────────────
+// Data verifikasi disimpan di localStorage browser pengguna.
+// Struktur: key "kas-theblasson-verified" → JSON { "1": {metode, waktu}, ... }
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'kas-theblasson-verified';
 
-let verified = {};   // in-memory cache, di-sync dari/ke storage
+let verified = {};
 let currentNo = null;
 let selectedMetode = null;
 
-// Muat data dari persistent storage saat halaman dibuka
-async function loadVerified() {
+// Muat data dari localStorage saat halaman dibuka
+function loadVerified() {
   try {
-    const result = await window.storage.get(STORAGE_KEY, true);
-    if (result && result.value) {
-      verified = JSON.parse(result.value);
-    }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    verified = raw ? JSON.parse(raw) : {};
   } catch (e) {
-    // Key belum ada (pertama kali), mulai kosong
     verified = {};
   }
-  // Jika halaman Hasil sedang aktif, langsung refresh tabel
   if (document.getElementById('pageHasil').classList.contains('active')) {
     renderTabel();
   }
+  return Promise.resolve();
 }
 
-// Simpan satu entri verifikasi baru ke storage
-async function saveVerified(no, data) {
+// Simpan data ke localStorage
+function saveVerified(no, data) {
   verified[no] = data;
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(verified), true);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(verified));
   } catch (e) {
     console.error('Gagal menyimpan data:', e);
   }
+  return Promise.resolve();
 }
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
@@ -1051,10 +1047,10 @@ function setThumbPos(x) {
   return pct;
 }
 
-async function doVerifikasi() {
+function doVerifikasi() {
   if (!currentNo) return;
   const entri = { metode: selectedMetode, waktu: new Date().toISOString() };
-  await saveVerified(currentNo, entri);
+  saveVerified(currentNo, entri);
   showPage('page3');
   resetSlider();
 }
@@ -1240,26 +1236,25 @@ function updateEditBtns() {
   penBtn.style.color         = editStatus==='pending'  ? 'var(--danger)' : 'var(--muted)';
 }
 
-async function saveEdit() {
+function saveEdit() {
   if (!editingNo) return;
   if (editStatus === 'verified') {
     if (!editMetode) { alert('Pilih metode terlebih dahulu!'); return; }
     const existing = verified[editingNo];
     const entri = { metode: editMetode, waktu: existing ? existing.waktu : new Date().toISOString() };
-    await saveVerified(editingNo, entri);
+    saveVerified(editingNo, entri);
   } else {
-    // Hapus dari verified
     delete verified[editingNo];
-    try { await window.storage.set(STORAGE_KEY, JSON.stringify(verified), true); } catch(e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(verified)); } catch(e) {}
   }
   closeEditModal();
   renderTabel();
 }
 
-async function hapusVerifikasi(no) {
+function hapusVerifikasi(no) {
   if (!confirm(`Hapus verifikasi untuk no. ${no}?`)) return;
   delete verified[no];
-  try { await window.storage.set(STORAGE_KEY, JSON.stringify(verified), true); } catch(e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(verified)); } catch(e) {}
   renderTabel();
 }
 
